@@ -53,6 +53,9 @@ jobs:
                  - A general diagnosis and suggested approach for a fix or implementation,
                    written at a level of detail useful for an engineer to start implementing —
                    but do NOT write or propose actual code/diffs.
+               Format the comment body in GitHub-flavored Markdown (headings, bullet lists,
+               backticks for code/function names, etc.) so it renders cleanly on GitHub.
+
                Prefix the comment body with the marker "<!-- claude-issue-triage -->" so it can
                be identified later.
 
