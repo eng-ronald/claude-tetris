@@ -1,0 +1,68 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Issue Triage
+        id: claude-triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh issue view:*)"'
+          prompt: |
+            Analyze GitHub issue #${{ github.event.issue.number }} in ${{ github.repository }}.
+
+            1. Read the issue title and body with:
+               gh issue view ${{ github.event.issue.number }} --json title,body,labels,comments
+
+            2. Read CLAUDE.md and the relevant source files (game.js, index.html, style.css) to
+               understand the project architecture and identify which part of the code the issue
+               likely relates to.
+
+            3. Assign labels using ONLY the labels that already exist in this repository:
+               bug, documentation, duplicate, enhancement, good first issue, help wanted,
+               invalid, question, wontfix.
+               Apply the ones that fit with:
+                 gh issue edit ${{ github.event.issue.number }} --add-label "label1,label2"
+               If this is an edit to an existing issue and previously-applied labels from this
+               list no longer fit, remove them with:
+                 gh issue edit ${{ github.event.issue.number }} --remove-label "label"
+
+            4. Post a diagnosis comment on the issue with:
+                 gh issue comment ${{ github.event.issue.number }} --body "..."
+               The comment must include:
+                 - A one-paragraph summary of the problem as understood from the issue.
+                 - The likely affected file(s)/area(s) of the code (reference file names and,
+                   where possible, function names from game.js, e.g. `collide`, `tryRotate`,
+                   `clearLines`, `spawn`, `draw`, etc.).
+                 - A general diagnosis and suggested approach for a fix or implementation,
+                   written at a level of detail useful for an engineer to start implementing —
+                   but do NOT write or propose actual code/diffs.
+               Prefix the comment body with the marker "<!-- claude-issue-triage -->" so it can
+               be identified later.
+
+               Before posting, check the existing comments returned in step 1 for one starting
+               with the marker "<!-- claude-issue-triage -->". If found and this run was
+               triggered by an edit to the issue, update that comment instead of creating a new
+               one, using:
+                 gh issue comment ${{ github.event.issue.number }} --edit-last --body "..."
+               (only if the last comment on the issue is the marked Claude comment; otherwise
+               post a new comment as usual).
+
+            Do not modify any files in the repository. Only use `gh issue edit` and
+            `gh issue comment` to take action.
