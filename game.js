@@ -40,9 +40,15 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const highscoreListEl = document.getElementById('highscore-list');
+const resetScoresBtn = document.getElementById('reset-scores-btn');
+const playerNameInput = document.getElementById('player-name-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let themeGridLine = '#22222e', themeBlockHighlight = 'rgba(255,255,255,0.12)';
+let combo = 0, maxCombo = 0, maxLinesInClear = 0;
+let lastSavedScore = null;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -110,8 +116,12 @@ function clearLines() {
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
+    maxLinesInClear = Math.max(maxLinesInClear, cleared);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -139,7 +149,8 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const cleared = clearLines();
+  if (!cleared) combo = 0;
   spawn();
 }
 
@@ -226,6 +237,9 @@ function endGame() {
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
+  lastSavedScore = null;
+  playerNameInput.value = '';
+  playerNameInput.focus();
 }
 
 function togglePause() {
@@ -263,6 +277,9 @@ function init() {
   score = 0;
   lines = 0;
   level = 1;
+  combo = 0;
+  maxCombo = 0;
+  maxLinesInClear = 0;
   paused = false;
   gameOver = false;
   dropInterval = 1000;
@@ -329,5 +346,79 @@ themeToggle.addEventListener('change', () => {
 });
 
 setTheme(localStorage.getItem('tetris-theme') === 'light' ? 'light' : 'dark');
+
+const HIGHSCORES_KEY = 'tetris-highscores';
+
+function loadScores() {
+  try {
+    const raw = localStorage.getItem(HIGHSCORES_KEY);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveScores(list) {
+  localStorage.setItem(HIGHSCORES_KEY, JSON.stringify(list));
+}
+
+function renderHighscores() {
+  const list = loadScores();
+  highscoreListEl.innerHTML = '';
+  if (!list.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'Sin records aún';
+    highscoreListEl.appendChild(li);
+    return;
+  }
+  list.forEach(entry => {
+    const li = document.createElement('li');
+    if (lastSavedScore !== null && entry.score === lastSavedScore) {
+      li.classList.add('highlight');
+    }
+    const name = document.createElement('span');
+    name.className = 'hs-name';
+    name.textContent = entry.name;
+    const details = document.createElement('span');
+    details.className = 'hs-details';
+    details.textContent = `${entry.score.toLocaleString()} pts · combo x${entry.combo} · ${entry.lines} líneas`;
+    li.appendChild(name);
+    li.appendChild(details);
+    highscoreListEl.appendChild(li);
+  });
+}
+
+function maybeAddScore(name) {
+  const list = loadScores();
+  const entry = { name: name || 'Jugador', score, combo: maxCombo, lines: maxLinesInClear };
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  list.length = Math.min(list.length, 5);
+  saveScores(list);
+  lastSavedScore = entry.score;
+  renderHighscores();
+}
+
+saveScoreBtn.addEventListener('click', () => {
+  maybeAddScore(playerNameInput.value.trim());
+});
+
+playerNameInput.addEventListener('keydown', e => {
+  if (e.code === 'Enter') {
+    maybeAddScore(playerNameInput.value.trim());
+  }
+});
+
+resetScoresBtn.addEventListener('click', () => {
+  if (confirm('¿Seguro que quieres borrar todos los records?')) {
+    localStorage.removeItem(HIGHSCORES_KEY);
+    lastSavedScore = null;
+    renderHighscores();
+  }
+});
+
+renderHighscores();
 
 init();
