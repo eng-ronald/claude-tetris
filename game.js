@@ -28,6 +28,40 @@ const PIECES = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+const SKIN_PALETTES = {
+  retro: COLORS,
+  neon: [
+    null,
+    '#00e5ff', // I
+    '#fff700', // O
+    '#e040fb', // T
+    '#39ff14', // S
+    '#ff1744', // Z
+    '#2979ff', // J
+    '#ff9100', // L
+  ],
+  pastel: [
+    null,
+    '#b8ecf0', // I
+    '#fff2c2', // O
+    '#e3c6ee', // T
+    '#c8e8c8', // S
+    '#f4c6c6', // Z
+    '#c6dcf4', // J
+    '#fbdcb9', // L
+  ],
+  pixel: [
+    null,
+    '#26c6da', // I
+    '#fbc02d', // O
+    '#ab47bc', // T
+    '#66bb6a', // S
+    '#ef5350', // Z
+    '#42a5f5', // J
+    '#ffa726', // L
+  ],
+};
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -40,9 +74,11 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const skinSelect = document.getElementById('skin-select');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let themeGridLine = '#22222e', themeBlockHighlight = 'rgba(255,255,255,0.12)';
+let currentSkin = 'retro';
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -160,13 +196,58 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const palette = SKIN_PALETTES[currentSkin] || COLORS;
+  const color = palette[colorIndex];
+  const bx = x * size + 1;
+  const by = y * size + 1;
+  const bs = size - 2;
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = themeBlockHighlight;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+
+  switch (currentSkin) {
+    case 'neon': {
+      context.shadowBlur = 12;
+      context.shadowColor = color;
+      context.fillStyle = color;
+      context.fillRect(bx, by, bs, bs);
+      context.shadowBlur = 0;
+      break;
+    }
+    case 'pastel': {
+      context.fillStyle = color;
+      const radius = Math.max(2, size * 0.18);
+      if (context.roundRect) {
+        context.beginPath();
+        context.roundRect(bx, by, bs, bs, radius);
+        context.fill();
+      } else {
+        context.fillRect(bx, by, bs, bs);
+      }
+      break;
+    }
+    case 'pixel': {
+      context.fillStyle = color;
+      context.fillRect(bx, by, bs, bs);
+      // checkerboard dithering overlay
+      const half = bs / 2;
+      context.fillStyle = 'rgba(0,0,0,0.15)';
+      context.fillRect(bx, by, half, half);
+      context.fillRect(bx + half, by + half, half, half);
+      context.fillStyle = 'rgba(255,255,255,0.15)';
+      context.fillRect(bx + half, by, half, half);
+      context.fillRect(bx, by + half, half, half);
+      break;
+    }
+    case 'retro':
+    default: {
+      context.fillStyle = color;
+      context.fillRect(bx, by, bs, bs);
+      // highlight
+      context.fillStyle = themeBlockHighlight;
+      context.fillRect(bx, by, bs, 4);
+      break;
+    }
+  }
+
   context.globalAlpha = 1;
 }
 
@@ -328,6 +409,25 @@ themeToggle.addEventListener('change', () => {
   setTheme(themeToggle.checked ? 'light' : 'dark');
 });
 
+function setSkin(skin) {
+  if (!SKIN_PALETTES[skin]) skin = 'retro';
+  currentSkin = skin;
+  localStorage.setItem('tetris-skin', skin);
+  if (skin === 'neon') {
+    document.body.setAttribute('data-skin', 'neon');
+  } else {
+    document.body.removeAttribute('data-skin');
+  }
+  skinSelect.value = skin;
+  if (current) {
+    draw();
+    drawNext();
+  }
+}
+
+skinSelect.addEventListener('change', () => setSkin(skinSelect.value));
+
 setTheme(localStorage.getItem('tetris-theme') === 'light' ? 'light' : 'dark');
+setSkin(localStorage.getItem('tetris-skin') || 'retro');
 
 init();
