@@ -39,8 +39,10 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeToggle = document.getElementById('theme-toggle');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let themeGridLine = '#22222e', themeBlockHighlight = 'rgba(255,255,255,0.12)';
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -163,13 +165,13 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillStyle = themeBlockHighlight;
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = themeGridLine;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -300,5 +302,32 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+function readThemeColors() {
+  const styles = getComputedStyle(document.body);
+  themeGridLine = styles.getPropertyValue('--grid-line').trim();
+  themeBlockHighlight = styles.getPropertyValue('--block-highlight').trim();
+}
+
+function setTheme(theme) {
+  if (theme === 'light') {
+    document.body.setAttribute('data-theme', 'light');
+  } else {
+    document.body.removeAttribute('data-theme');
+  }
+  themeToggle.checked = theme === 'light';
+  localStorage.setItem('tetris-theme', theme);
+  readThemeColors();
+  if (current) {
+    draw();
+    drawNext();
+  }
+}
+
+themeToggle.addEventListener('change', () => {
+  setTheme(themeToggle.checked ? 'light' : 'dark');
+});
+
+setTheme(localStorage.getItem('tetris-theme') === 'light' ? 'light' : 'dark');
 
 init();
